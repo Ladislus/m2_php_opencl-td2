@@ -1,0 +1,5 @@
+#define VERBOSE @verbose@
+#define FILENAME "@filename@"
+
+#define LOG(code) if (VERBOSE) { code }
+#define CHECK(condition, message) if (condition) { std::cerr << "[ERROR in " << __FILE__ << " at " << __func__ << ":" << __LINE__ << "] " <<  message << std::endl; exit(EXIT_FAILURE); }
