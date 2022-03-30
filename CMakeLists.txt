@@ -6,8 +6,14 @@ SET(EXEC_NAME main)
 SET(others MNT.txt MIN.txt)
 
 # Pass variable from CMake to the code through a header file
-SET(filename MIN.txt)
-OPTION(VERBOSE "Print verbose messages" OFF)
+SET(filename MNT.txt)
+
+IF(${CMAKE_BUILD_TYPE} MATCHES Debug)
+    OPTION(VERBOSE "Print verbose messages" ON)
+ELSE()
+    OPTION(VERBOSE "Print verbose messages" OFF)
+ENDIF()
+
 IF (VERBOSE)
     MESSAGE(STATUS "Verbose messages enabled")
     ADD_COMPILE_OPTIONS(-DVERBOSE)
