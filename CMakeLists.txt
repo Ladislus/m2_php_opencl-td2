@@ -3,23 +3,20 @@ PROJECT("TD2 OpenCL" VERSION 1.0.0 LANGUAGES CXX)
 
 # Variable for the executable name & additional OpenCL file to be copied inside the build directory
 SET(EXEC_NAME main)
-SET(others MNT.txt)
+SET(others MNT.txt MIN.txt)
 
 # Pass variable from CMake to the code through a header file
-SET(filename MNT.txt)
+SET(filename MIN.txt)
 OPTION(VERBOSE "Print verbose messages" OFF)
 IF (VERBOSE)
     MESSAGE(STATUS "Verbose messages enabled")
-    SET(verbose 1)
-ELSE()
-    SET(verbose 0)
+    ADD_COMPILE_OPTIONS(-DVERBOSE)
 ENDIF()
 CONFIGURE_FILE(
         "${PROJECT_SOURCE_DIR}/config.h.in"
         "${PROJECT_BINARY_DIR}/config.h"
 )
 INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
-
 
 # Set C++ standard
 SET(CMAKE_CXX_STANDARD 20)
