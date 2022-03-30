@@ -5,39 +5,30 @@
 
 #include "config.h"
 
-void read_file(size_t *sz_x, size_t *sz_y, size_t *left, size_t *right, size_t *cell, int *nodata, float *data) {
+void read_file(size_t& sz_x, size_t& sz_y, size_t& left, size_t& right, size_t& cell, int& nodata, float *data) {
 	FILE *fp = fopen(FILENAME, "r");
 	if (fp == nullptr) exit(EXIT_FAILURE);
 
-	fscanf(fp, "%zu", sz_x);
-	fscanf(fp, "%zu", sz_y);
-	fscanf(fp, "%zu", left);
-	fscanf(fp, "%zu", right);
-	fscanf(fp, "%zu", cell);
-	fscanf(fp, "%d", nodata);
+	fscanf(fp, "%zu", &sz_x);
+	fscanf(fp, "%zu", &sz_y);
+	fscanf(fp, "%zu", &left);
+	fscanf(fp, "%zu", &right);
+	fscanf(fp, "%zu", &cell);
+	fscanf(fp, "%d", &nodata);
 
-	LOG(
-			std::clog << "sz_x: " << (*sz_x) << std::endl;
-			std::clog << "sz_y: " << (*sz_y) << std::endl;
-			std::clog << "left: " << (*left) << std::endl;
-			std::clog << "right: " << (*right) << std::endl;
-			std::clog << "cell: " << (*cell) << std::endl;
-			std::clog << "nodata: " << (*nodata) << std::endl;
-	)
-
-	data = new float[(*sz_x) * (*sz_y)];
+	data = new float[sz_x * sz_y];
 	float height;
-	for (size_t i = 0; i < (*sz_x); ++i) {
-		for (size_t j = 0; j < (*sz_y); ++j) {
+	for (size_t i = 0; i < sz_x; ++i) {
+		for (size_t j = 0; j < sz_y; ++j) {
 			fscanf(fp, "%f", &height);
-			data[i * (*sz_x) + j] = height;
+			data[i * sz_x + j] = height;
 		}
 	}
 
 	//LOG(
-	//	for(size_t i = 0; i < (*sz_x); ++i) {
+	//	for(size_t i = 0; i < sz_x; ++i) {
 	//		std::clog << "\ti: " << i << " [ ";
-	//		for(size_t j = 0; j < (*sz_y); ++j) std::clog << data[i * (*sz_y) + j] << " ";
+	//		for(size_t j = 0; j < sz_y; ++j) std::clog << data[i * sz_y + j] << " ";
 	//		std::clog << "]" << std::endl;
 	//	}
 	//)
@@ -109,7 +100,16 @@ int main() {
 	size_t sz_x = 0, sz_y = 0, left = 0, right = 0, cell = 0;
 	int nodata = 0;
 	float *data = nullptr;
-	read_file(&sz_x, &sz_y, &left, &right, &cell, &nodata, data);
+	read_file(sz_x, sz_y, left, right, cell, nodata, data);
+
+	LOG(
+		std::clog << "sz_x: " << (sz_x) << std::endl;
+		std::clog << "sz_y: " << (sz_y) << std::endl;
+		std::clog << "left: " << (left) << std::endl;
+		std::clog << "right: " << (right) << std::endl;
+		std::clog << "cell: " << (cell) << std::endl;
+		std::clog << "nodata: " << (nodata) << std::endl;
+	)
 
 	uint8_t *directions = generator_direction(sz_x, sz_y, data);
 
