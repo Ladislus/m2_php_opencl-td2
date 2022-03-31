@@ -67,7 +67,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x - 1, y - 1, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 1;
-					minimum_value = get(data, x - 1, y - 1, sz_x);
+					minimum_value = current;
 				}
 			}
 
@@ -75,7 +75,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x - 1, y, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 2;
-					minimum_value = get(data, x - 1, y, sz_x);
+					minimum_value = current;
 				}
 			}
 
@@ -83,7 +83,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x - 1, y + 1, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 3;
-					minimum_value = get(data, x - 1, y + 1, sz_x);
+					minimum_value = current;
 				}
 			}
 
@@ -91,7 +91,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x, y + 1, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 4;
-					minimum_value = get(data, x, y + 1, sz_x);
+					minimum_value = current;
 				}
 			}
 
@@ -99,7 +99,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x + 1, y + 1, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 5;
-					minimum_value = get(data, x + 1, y + 1, sz_x);
+					minimum_value = current;
 				}
 			}
 
@@ -107,7 +107,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x + 1, y, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 6;
-					minimum_value = get(data, x + 1, y, sz_x);
+					minimum_value = current;
 				}
 			}
 
@@ -115,7 +115,7 @@ uint8_t *generator_direction(const size_t &sz_x, const size_t &sz_y, const float
 				current = get(data, x + 1, y - 1, sz_x);
 				if (current < minimum_value && ((int) current != nodata)) {
 					direction = 7;
-					minimum_value = get(data, x + 1, y - 1, sz_x);
+					minimum_value = current;
 				}
 			}
 
