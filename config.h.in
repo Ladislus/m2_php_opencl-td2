@@ -1,4 +1,5 @@
 #define FILENAME "@filename@"
+#define PROGRAM "@program@"
 
 #ifdef VERBOSE
 	#define LOG(code) { code }
