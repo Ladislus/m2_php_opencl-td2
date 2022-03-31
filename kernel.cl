@@ -1,10 +1,10 @@
 __kernel
-void directions(__constant const int sz_x, __constant const int sz_y, __constant const int nodata, __global const float *const data, __global unsigned char *const directions) {
+void directions(const int sz_x, const int sz_y, const int nodata, __global const float *const data, __global unsigned char *const directions) {
 	__private const int x = get_global_id(0);
 	__private const int y = get_global_id(1);
 
-	__constant const unsigned long max_x = sz_x - 1;
-	__constant const unsigned long max_y = sz_y - 1;
+	const unsigned long max_x = sz_x - 1;
+	const unsigned long max_y = sz_y - 1;
 
 	//if (((int) get(data, x, y, sz_x)) != nodata) {
 	if (((int) data[x * sz_x + y]) != nodata) {
@@ -85,10 +85,10 @@ void directions(__constant const int sz_x, __constant const int sz_y, __constant
 }
 
 __kernel
-void compute(__constant const int sz_x, __constant const int sz_y, __global const unsigned char *const directions, __global unsigned char *const water, __global bool* const hasChanged) {
+void compute(const int sz_x, const int sz_y, __global const unsigned char *const directions, __global unsigned char *const water, __global bool* const hasChanged) {
 	__private const int x = get_global_id(0);
 	__private const int y = get_global_id(1);
 
-	__constant const unsigned long max_x = sz_x - 1;
-	__constant const unsigned long max_y = sz_y - 1;
+	const unsigned long max_x = sz_x - 1;
+	const unsigned long max_y = sz_y - 1;
 }

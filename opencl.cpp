@@ -1,12 +1,13 @@
+#define __CL_ENABLE_EXCEPTIONS
+
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <vector>
+
 #include "CL/cl.hpp"
 
 #include "config.h"
-
-#define __CL_ENABLE_EXCEPTIONS
 
 #define DECL_GET(__type) 																					\
 	inline __type get(const __type *const array, const size_t &x, const size_t &y, const size_t &sz_x) { 	\
