@@ -9,8 +9,12 @@
 
 #include "config.h"
 
-#define GLOBAL_SIZE 36
-#define LOCAL_SIZE 6
+// MIN.txt
+//#define GLOBAL_SIZE 36
+//#define LOCAL_SIZE 6
+// MNT.txt
+#define GLOBAL_SIZE 1025 * 1025
+#define LOCAL_SIZE 205
 
 #define OUTFILE "out.txt"
 
