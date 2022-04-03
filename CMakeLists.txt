@@ -10,16 +10,20 @@ SET(others MNT.txt MIN.txt kernel.cl)
 SET(filename MIN.txt)
 SET(program kernel.cl)
 
+# Add compile flags and VERBOSE option depending on the compilation type
 IF(${CMAKE_BUILD_TYPE} MATCHES Debug)
     OPTION(VERBOSE "Print verbose messages" ON)
+    ADD_COMPILE_OPTIONS(-g -O0 -Wall -Wextra -pedantic)
 ELSE()
     OPTION(VERBOSE "Print verbose messages" OFF)
+    ADD_COMPILE_OPTIONS(-O3)
 ENDIF()
 
 IF (VERBOSE)
     MESSAGE(STATUS "Verbose messages enabled")
     ADD_COMPILE_OPTIONS(-DVERBOSE)
 ENDIF()
+
 CONFIGURE_FILE(
         "${PROJECT_SOURCE_DIR}/config.h.in"
         "${PROJECT_BINARY_DIR}/config.h"
@@ -27,14 +31,7 @@ CONFIGURE_FILE(
 INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
 
 # Set C++ standard
-SET(CMAKE_CXX_STANDARD 20)
-
-# Add compile flags for warnings and optimization
-IF(${CMAKE_BUILD_TYPE} MATCHES RELEASE)
-    ADD_COMPILE_OPTIONS(-O3)
-ELSE()
-    ADD_COMPILE_OPTIONS(-g -O0 -Wall -Wextra -pedantic)
-ENDIF()
+SET(CMAKE_CXX_STANDARD 11)
 
 # Use FindOpenCL through FIND_PACKAGE
 FIND_PACKAGE(OpenCL REQUIRED)

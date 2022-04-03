@@ -4,7 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
-#include <ctime>
+#include <chrono>
 #include "CL/cl.hpp"
 
 #include "config.h"
@@ -17,30 +17,33 @@
 #define KERNEL_DIRECTION "direction"
 #define KERNEL_WATER "compute"
 
+#define NOW std::chrono::system_clock::now()
+using Time = std::chrono::time_point <std::chrono::system_clock>;
+using Duration = std::chrono::duration<double>;
+
+inline void duration(const Time &start, const Time &end) {
+	Duration elapsed = end - start;
+	std::clog << "Elapsed time: " << elapsed.count() << "s" << std::endl;
+}
+
 #define DECL_GET(__type) 																					\
 	inline __type get(const __type *const array, const size_t &x, const size_t &y, const size_t &sz_x) { 	\
 		return array[x * sz_x + y];																			\
 	}
 
-#define DECL_SET(__type) 																								\
-	inline void set(__type *const array, const size_t &x, const size_t &y, const size_t &sz_x, const __type &value) {	\
-		array[x * sz_x + y] = value;																					\
-	}
-
-#define DECL_PRINT(__type) 																									\
+#define DECL_PRINT(__type)  																								\
+	DECL_GET(__type)																										\
 	inline void print_array(const __type *const array, const size_t &sz_x, const size_t &sz_y, const std::string &name) {	\
         std::clog << name << std::endl;                                            											\
 		for (size_t x = 0; x < sz_x; ++x) {                                                									\
-			std::cout << "x:" << x << " [ ";																				\
+			std::clog << " [ ";																								\
 			for (size_t y = 0; y < sz_y; ++y)   																			\
-                std::cout << "y:" << get(array, x, y, sz_x) << " ";                         								\
-            std::cout << "]" << std::endl;                  																\
+                std::clog << get(array, x, y, sz_x) << " ";                         										\
+            std::clog << "]" << std::endl;                  																\
 		}																													\
 	}																														\
 
-DECL_GET(float)
 DECL_PRINT(float)
-DECL_GET(int)
 DECL_PRINT(int)
 
 void read_file(size_t& sz_x, size_t& sz_y, size_t& left, size_t& right, size_t& cell, int& nodata, float **data) {
@@ -124,23 +127,25 @@ bool has_zero(const int *const array, const size_t &sz_x, const size_t &sz_y) {
 void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Context &context,
 		 const float *const data, const size_t sz_x, const size_t sz_y, int *const directions, int *const water, const int &nodata) {
 
+	Time start = NOW;
+
 	// Size_t dosen't exist in OpenCL, so we have to convert it to int
 	const int shrinked_sz_x = (int) sz_x;
 	const int shrinked_sz_y = (int) sz_y;
 
 	// Create buffers
 	cl::Buffer data_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(float) * sz_x * sz_y);
-	cl::Buffer direction_bufffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
+	cl::Buffer direction_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
 
 	queue.enqueueWriteBuffer(data_buffer, CL_TRUE, 0, sizeof(float) * sz_x * sz_y, data);
-	queue.enqueueWriteBuffer(direction_bufffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, directions);
+	queue.enqueueWriteBuffer(direction_buffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, directions);
 
-	print_array(data, sz_x, sz_y, "DATA");
+	LOG(print_array(data, sz_x, sz_y, "DATA");)
 
 	// Setup direction computation
 	cl::Kernel kernel_direction(program, KERNEL_DIRECTION);
 	kernel_direction.setArg(0, data_buffer);
-	kernel_direction.setArg(1, direction_bufffer);
+	kernel_direction.setArg(1, direction_buffer);
 	kernel_direction.setArg(2, shrinked_sz_x);
 	kernel_direction.setArg(3, shrinked_sz_y);
 	kernel_direction.setArg(4, 8 * sizeof(float), nullptr);
@@ -154,18 +159,18 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 	queue.enqueueNDRangeKernel(kernel_direction, cl::NullRange, global, local);
 
 	// Fetch result
-	queue.enqueueReadBuffer(direction_bufffer, CL_TRUE, 0, sz_x * sz_y * sizeof(int), directions);
+	queue.enqueueReadBuffer(direction_buffer, CL_TRUE, 0, sz_x * sz_y * sizeof(int), directions);
 
-	print_array(directions, sz_x, sz_y, "DIRECTION");
-	print_in_file(directions, sz_x, sz_y, "DIRECTION", true);
+	LOG(
+		print_array(directions, sz_x, sz_y, "DIRECTION");
+		print_in_file(directions, sz_x, sz_y, "DIRECTION", true);
+	)
 
 	// ######################################################################################################################
 
 
 	// Create buffers
 	cl::Buffer water_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
-	cl::Buffer direction_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(int) * sz_x * sz_y);
-	queue.enqueueWriteBuffer(direction_buffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, directions);
 	queue.enqueueWriteBuffer(water_buffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, water);
 
 	// Setup water computation
@@ -182,7 +187,12 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 	} while (has_zero(water, sz_x, sz_y));
 
 	// Output results
-	print_in_file(water, sz_x, sz_y, "WATER", false);
+	LOG(
+		print_array(water, sz_x, sz_y, "WATER");
+		print_in_file(water, sz_x, sz_y, "WATER", false);
+	)
+
+	duration(start, NOW);
 }
 
 int main() {
