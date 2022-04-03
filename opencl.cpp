@@ -27,7 +27,7 @@ using Duration = std::chrono::duration<double>;
 
 inline void duration(const Time &start, const Time &end) {
 	Duration elapsed = end - start;
-	std::clog << "Elapsed time: " << elapsed.count() << "s" << std::endl;
+	std::cout << elapsed.count() << std::endl;
 }
 
 #define DECL_GET(__type) 																					\
