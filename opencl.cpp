@@ -180,6 +180,7 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 
 	// Create buffers
 	cl::Buffer water_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
+	cl::Buffer has_changed_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(bool));
 	queue.enqueueWriteBuffer(water_buffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, water);
 
 	// Setup water computation
@@ -188,12 +189,16 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 	kernel_water.setArg(1, direction_buffer);
 	kernel_water.setArg(2, shrinked_sz_x);
 	kernel_water.setArg(3, shrinked_sz_y);
+	kernel_water.setArg(4, has_changed_buffer);
 
 	// While there is water flow to compute
+	bool has_changed = false;
 	do {
+		has_changed = false;
+		queue.enqueueWriteBuffer(has_changed_buffer, CL_TRUE, 0, sizeof(bool), &has_changed);
 		queue.enqueueNDRangeKernel(kernel_water, cl::NullRange, global, local);
-		queue.enqueueReadBuffer(water_buffer, CL_TRUE, 0, sz_x * sz_y * sizeof(int), water);
-	} while (has_zero(water, sz_x, sz_y));
+		queue.enqueueReadBuffer(has_changed_buffer, CL_TRUE, 0, sizeof(bool), &has_changed);
+	} while (has_changed);
 
 	// Output results
 	LOG(

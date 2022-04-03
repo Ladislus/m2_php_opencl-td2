@@ -69,7 +69,8 @@ void direction(__global float *data, __global int *direction,
 	direction[index] = (index_min == -1) ? 0 : index_min + 1;
 }
 
-__kernel void compute(__global int *res, __global int *direction, const int nx, const int ny) {
+__kernel
+void compute(__global int *res, __global int *direction, const int nx, const int ny, __global bool *has_changed) {
 
 	// Get the current pixel position
 	int id = get_global_id(0);
@@ -77,8 +78,10 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 	int j = (id - (i * nx));
 	int index = i * nx + j;
 
+	const int previous = res[index];
+
 	// Store the sum
-	int sum = 0;
+	int sum = 1;
 
 	// Compute the sum of all neighbors pointing to the current pixel
 	// If one of the neighbors is no computed yet (res = 0), break the loop
@@ -89,14 +92,12 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 		if (direction[(i - 1) * nx + j] == 6) {
 			if (res[(i - 1) * nx + j] != 0)
 				sum += res[(i - 1) * nx + j]; // N
-			else return;
 		}
 
 		if (j > 0) {
 			if (direction[(i - 1) * nx + (j - 1)] == 5) {
 				if (res[(i - 1) * nx + (j - 1)] != 0)
 					sum += res[(i - 1) * nx + (j - 1)]; // NO
-				else return;
 			}
 		}
 
@@ -104,7 +105,6 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 			if (direction[(i - 1) * nx + (j + 1)] == 7) {
 				if (res[(i - 1) * nx + (j + 1)] != 0)
 					sum += res[(i - 1) * nx + (j + 1)]; // NE
-				else return;
 			}
 		}
 	}
@@ -114,14 +114,12 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 		if (direction[(i + 1) * nx + j] == 2) {
 			if (res[(i + 1) * nx + j] != 0)
 				sum += res[(i + 1) * nx + j]; // S
-			else return;
 		}
 
 		if (j > 0) {
 			if (direction[(i + 1) * nx + (j - 1)] == 3) {
 				if (res[(i + 1) * nx + (j - 1)] != 0)
 					sum += res[(i + 1) * nx + (j - 1)]; // SO
-				else return;
 			}
 		}
 
@@ -129,7 +127,6 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 			if (direction[(i + 1) * nx + (j + 1)] == 1) {
 				if (res[(i + 1) * nx + (j + 1)] != 0)
 					sum += res[(i + 1) * nx + (j + 1)]; // SE
-				else return;
 			}
 		}
 	}
@@ -139,7 +136,6 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 		if (direction[index - 1] == 4) {
 			if (res[index - 1] != 0)
 				sum += res[index - 1]; // O
-			else return;
 		}
 	}
 
@@ -148,10 +144,11 @@ __kernel void compute(__global int *res, __global int *direction, const int nx, 
 		if (direction[index + 1] == 8) {
 			if (res[index + 1] != 0)
 				sum += res[index + 1]; // E
-			else return;
 		}
 	}
 
-	// Set the num sum + 1
-	res[index] = ++sum;
+	if (sum != previous) {
+		*has_changed = true;
+		res[index] = sum;
+	}
 }
