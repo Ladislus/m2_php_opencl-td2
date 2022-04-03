@@ -18,15 +18,6 @@ DECL_GET(float)
 DECL_SET(float)
 DECL_GET(uint8_t)
 
-//void print_directions(const uint8_t *const directions, const size_t &sz_x, const size_t &sz_y) {
-//	// Array aren't displayed
-//	constexpr char arrows[] = "x↖↑↗→↘↓↙←";
-//	for (size_t i = 0; i < sz_x; ++i) {
-//		for (size_t j = 0; j < sz_y; ++j) std::cout << arrows[directions[i * sz_y + j]] << " ";
-//		std::cout << std::endl;
-//	}
-//}
-
 void read_file(size_t& sz_x, size_t& sz_y, size_t& left, size_t& right, size_t& cell, int& nodata, float **data) {
 	FILE *fp = fopen(FILENAME, "r");
 	if (fp == nullptr) exit(EXIT_FAILURE);
