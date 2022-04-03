@@ -1,13 +1,21 @@
 #define __CL_ENABLE_EXCEPTIONS
 
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
 #include <vector>
-
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
+#include <ctime>
 #include "CL/cl.hpp"
 
 #include "config.h"
+
+#define GLOBAL_SIZE 36
+#define LOCAL_SIZE 6
+
+#define OUTFILE "out.txt"
+
+#define KERNEL_DIRECTION "direction"
+#define KERNEL_WATER "compute"
 
 #define DECL_GET(__type) 																					\
 	inline __type get(const __type *const array, const size_t &x, const size_t &y, const size_t &sz_x) { 	\
@@ -19,8 +27,21 @@
 		array[x * sz_x + y] = value;																					\
 	}
 
+#define DECL_PRINT(__type) 																									\
+	inline void print_array(const __type *const array, const size_t &sz_x, const size_t &sz_y, const std::string &name) {	\
+        std::clog << name << std::endl;                                            											\
+		for (size_t x = 0; x < sz_x; ++x) {                                                									\
+			std::cout << "x:" << x << " [ ";																				\
+			for (size_t y = 0; y < sz_y; ++y)   																			\
+                std::cout << "y:" << get(array, x, y, sz_x) << " ";                         								\
+            std::cout << "]" << std::endl;                  																\
+		}																													\
+	}																														\
+
 DECL_GET(float)
-DECL_GET(uint8_t)
+DECL_PRINT(float)
+DECL_GET(int)
+DECL_PRINT(int)
 
 void read_file(size_t& sz_x, size_t& sz_y, size_t& left, size_t& right, size_t& cell, int& nodata, float **data) {
 	FILE *fp = fopen(FILENAME, "r");
@@ -56,169 +77,158 @@ cl::Program create_program(const std::string& filename, const cl::Context& conte
 	return { context, source };
 }
 
-uint8_t* compute_directions(const cl::Program &program, const cl::CommandQueue &queue, const cl::Context &context, const size_t &sz_x, const size_t &sz_y, const int &nodata, float *data) {
-	// Define size constants
-	const size_t sz_float = sizeof(float) * sz_x * sz_y;
-	const size_t sz_uint8 = sizeof(uint8_t) * sz_x * sz_y;
-
-	// Allocate memory for the result
-	auto *const directions = new uint8_t[sz_x * sz_y];
-
-	// Create buffers
-	cl::Buffer buffer_data(context, CL_MEM_READ_ONLY, sz_float);
-	cl::Buffer buffer_directions(context, CL_MEM_WRITE_ONLY, sz_uint8);
-
-	// Copy data to the device
-	queue.enqueueWriteBuffer(buffer_data, CL_TRUE, 0, sz_float, data);
-
-	// Create directions_kernel
-	cl::Kernel directions_kernel(program, "directions");
-
-	// Set directions_kernel arguments
-	directions_kernel.setArg(0, sz_x);
-	directions_kernel.setArg(1, sz_y);
-	directions_kernel.setArg(2, nodata);
-	directions_kernel.setArg(3, buffer_data);
-	directions_kernel.setArg(4, buffer_directions);
-
-	// Create topology
-	cl::NDRange global(sz_x, sz_y);  // Processing elements
-	cl::NDRange local(16, 16); 		// Compute units
-
-	// Launch program
-	queue.enqueueNDRangeKernel(directions_kernel, cl::NullRange, global, local);
-
-	// Read result from the device
-	queue.enqueueReadBuffer(buffer_directions, CL_TRUE, 0, sz_uint8, directions);
-
-	// Return the result
-	return directions;
+std::string get_arrow(const int &index) {
+	switch (index) {
+		default:
+		case 0:
+			return " ";
+		case 1:
+			return "↖";
+		case 2:
+			return "↑";
+		case 3:
+			return "↗";
+		case 4:
+			return "→";
+		case 5:
+			return "↘";
+		case 6:
+			return "↓";
+		case 7:
+			return "↙";
+		case 8:
+			return "←";
+	}
 }
 
-const float* compute(const cl::Program &program, const cl::CommandQueue &queue, const cl::Context &context, const size_t &sz_x, const size_t &sz_y, const uint8_t *const directions) {
-	const size_t sz_float = sizeof(float) * sz_x * sz_y;
-	const size_t sz_uint8 = sizeof(uint8_t) * sz_x * sz_y;
+void print_in_file(const int *const array, const size_t &sz_x, const size_t &sz_y, const std::string &nom, const bool &is_arrow) {
+	std::ofstream file;
+	file.open(OUTFILE, std::ios::app);
+	file << nom << ":" << std::endl;
+	for (size_t i = 0; i < sz_x; ++i) {
+		for (size_t j = 0; j < sz_y; ++j)
+			(is_arrow) ?
+				file << get_arrow(get(array, i, j, sz_x)) << " " :
+				file << get(array, i, j, sz_x) << " ";
+		file << std::endl;
+	}
+	file.close();
+}
 
-	auto *water = new float[sz_x * sz_y] { 0.f };
+bool has_zero(const int *const array, const size_t &sz_x, const size_t &sz_y) {
+	for (size_t i = 0; i < sz_x * sz_y; ++i)
+		if (array[i] == 0) return true;
+	return false;
+}
+
+void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Context &context,
+		 const float *const data, const size_t sz_x, const size_t sz_y, int *const directions, int *const water, const int &nodata) {
+
+	// Size_t dosen't exist in OpenCL, so we have to convert it to int
+	const int shrinked_sz_x = (int) sz_x;
+	const int shrinked_sz_y = (int) sz_y;
 
 	// Create buffers
-	cl::Buffer buffer_directions(context, CL_MEM_READ_ONLY, sz_uint8);
-	cl::Buffer buffer_water(context, CL_MEM_READ_WRITE, sz_float);
-	cl::Buffer buffer_hasChanged(context, CL_MEM_READ_WRITE, sizeof(bool));
+	cl::Buffer data_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(float) * sz_x * sz_y);
+	cl::Buffer direction_bufffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
 
-	// Copy data to the device
-	queue.enqueueWriteBuffer(buffer_directions, CL_TRUE, 0, sz_uint8, directions);
-	queue.enqueueWriteBuffer(buffer_water, CL_TRUE, 0, sz_float, water);
+	queue.enqueueWriteBuffer(data_buffer, CL_TRUE, 0, sizeof(float) * sz_x * sz_y, data);
+	queue.enqueueWriteBuffer(direction_bufffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, directions);
 
-	// Create compute_kernel
-	cl::Kernel compute_kernel(program, "compute");
+	print_array(data, sz_x, sz_y, "DATA");
 
-	// Set compute_kernel arguments
-	compute_kernel.setArg(0, sz_x);
-	compute_kernel.setArg(1, sz_y);
-	compute_kernel.setArg(2, buffer_directions);
-	compute_kernel.setArg(3, buffer_water);
-	compute_kernel.setArg(4, buffer_hasChanged);
+	// Setup direction computation
+	cl::Kernel kernel_direction(program, KERNEL_DIRECTION);
+	kernel_direction.setArg(0, data_buffer);
+	kernel_direction.setArg(1, direction_bufffer);
+	kernel_direction.setArg(2, shrinked_sz_x);
+	kernel_direction.setArg(3, shrinked_sz_y);
+	kernel_direction.setArg(4, 8 * sizeof(float), nullptr);
+	kernel_direction.setArg(5, nodata);
+	//Processing elements
+	cl::NDRange global(GLOBAL_SIZE);
+	// Compute units
+	cl::NDRange local(LOCAL_SIZE);
 
-	// Create topology
-	cl::NDRange global(sz_x, sz_y);  // Processing elements
-	cl::NDRange local(16, 16); 		// Compute units
+	// Start GPU
+	queue.enqueueNDRangeKernel(kernel_direction, cl::NullRange, global, local);
 
-	bool hasChanged;
+	// Fetch result
+	queue.enqueueReadBuffer(direction_bufffer, CL_TRUE, 0, sz_x * sz_y * sizeof(int), directions);
+
+	print_array(directions, sz_x, sz_y, "DIRECTION");
+	print_in_file(directions, sz_x, sz_y, "DIRECTION", true);
+
+	// ######################################################################################################################
+
+
+	// Create buffers
+	cl::Buffer water_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
+	cl::Buffer direction_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(int) * sz_x * sz_y);
+	queue.enqueueWriteBuffer(direction_buffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, directions);
+	queue.enqueueWriteBuffer(water_buffer, CL_TRUE, 0, sizeof(int) * sz_x * sz_y, water);
+
+	// Setup water computation
+	cl::Kernel kernel_water(program, KERNEL_WATER);
+	kernel_water.setArg(0, water_buffer);
+	kernel_water.setArg(1, direction_buffer);
+	kernel_water.setArg(2, shrinked_sz_x);
+	kernel_water.setArg(3, shrinked_sz_y);
+
+	// While there is water flow to compute
 	do {
-		// Reset hasChanged
-		queue.enqueueReadBuffer(buffer_hasChanged, CL_TRUE, 0, sizeof(bool), &hasChanged);
-		// Launch program
-		queue.enqueueNDRangeKernel(compute_kernel, cl::NullRange, global, local);
-		// Read result from the device (hasChanged)
-		queue.enqueueReadBuffer(buffer_hasChanged, CL_TRUE, 0, sizeof(bool), &hasChanged);
-	} while (hasChanged);
+		queue.enqueueNDRangeKernel(kernel_water, cl::NullRange, global, local);
+		queue.enqueueReadBuffer(water_buffer, CL_TRUE, 0, sz_x * sz_y * sizeof(int), water);
+	} while (has_zero(water, sz_x, sz_y));
 
-	return water;
+	// Output results
+	print_in_file(water, sz_x, sz_y, "WATER", false);
 }
 
 int main() {
-
 	size_t sz_x = 0, sz_y = 0, left = 0, right = 0, cell = 0;
 	int nodata = 0;
 	float *data = nullptr;
 	read_file(sz_x, sz_y, left, right, cell, nodata, &data);
-
-	LOG(
-		std::clog << "sz_x: " << sz_x << std::endl;
-		std::clog << "sz_y: " << sz_y << std::endl;
-		std::clog << "left: " << left << std::endl;
-		std::clog << "right: " << right << std::endl;
-		std::clog << "cell: " << cell << std::endl;
-		std::clog << "nodata: " << nodata << std::endl;
-
-		std::clog << "data:" << std::endl;
-		for (size_t i = 0; i < sz_x; ++i) {
-			std::clog << i << ": [ ";
-			for (size_t j = 0; j < sz_y; ++j)
-				std::clog << get(data, i, j, sz_x) << " ";
-			std::clog << "]" << std::endl;
-		}
-	)
+	const size_t sz = sz_x * sz_y;
+	int *directions = new int[sz], *water = new int[sz] { 0 };
 
 	try {
-		// Get platforms (should be unique on PC)
-		std::vector<cl::Platform> plateformes;
-		cl::Platform::get(&plateformes);
+		// Fetch platforms
+		std::vector<cl::Platform> platforms;
+		// Should be one on PC
+		cl::Platform::get(&platforms);
 
-		// Get devices associated with the first platform (Should be unique on PC)
+		// Fetch associated devices
 		std::vector<cl::Device> devices;
-		plateformes[0].getDevices(CL_DEVICE_TYPE_ALL, &devices);
+		platforms[0].getDevices(CL_DEVICE_TYPE_ALL, &devices);
 
-		// Create associated context
-		cl::Context contexte(devices);
-
-		// Create program
-		cl::Program program = create_program(PROGRAM, contexte);
-
-		// Build program (compilation)
+		// Create context
+		cl::Context context(devices);
+		// Read program code
+		cl::Program program = create_program(PROGRAM, context);
 		try {
+			// Compile program
 			program.build(devices);
 		} catch (...) {
-			// Catch all possible errors and exit with code 1
+			// Catch errors
 			cl_int buildErr = CL_SUCCESS;
 			auto buildInfo = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0], &buildErr);
 			std::cerr << buildInfo << std::endl << std::endl;
 			exit(1);
 		}
 
-		// Create the queue to communicate with the kernel
-		cl::CommandQueue queue = cl::CommandQueue(contexte, devices[0]);
+		// Create queue and start GPU version
+		cl::CommandQueue queue = cl::CommandQueue(context, devices[0]);
+		GPU(program, queue, context, data, sz_x, sz_y, directions, water, nodata);
 
-		uint8_t *directions = compute_directions(program, queue, contexte, sz_x, sz_y, nodata, data);
-		LOG(
-				std::clog << "directions:" << std::endl;
-				for (size_t i = 0; i < sz_x; ++i) {
-					std::clog << i << ": [ ";
-					for (size_t j = 0; j < sz_y; ++j)
-						std::clog << (int) get(directions, i, j, sz_x) << " ";
-					std::clog << "]" << std::endl;
-				}
-		)
-
+		// Free memory
 		delete[] data;
-
-		//auto water = compute(program, queue, contexte, sz_x, sz_y, directions);
-
-		//LOG(
-		//	std::clog << "Water:" << std::endl;
-		//	for (size_t i = 0; i < sz_x; ++i) {
-		//		std::clog << i << ": [ ";
-		//		for (size_t j = 0; j < sz_y; ++j)
-		//			std::clog << get(water, i, j, sz_x) << " ";
-		//		std::clog << "]" << std::endl;
-		//	}
-		//)
-
 		delete[] directions;
-		//delete[] water;
-	} catch (const cl::Error& err) {
-		std::cout << "Exception\n";
+		delete[] water;
+
+	} catch (const cl::Error &err) {
+		std::cout << "Exception" << std::endl;
 		std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
 		return EXIT_FAILURE;
 	}

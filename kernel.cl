@@ -1,94 +1,138 @@
 __kernel
-void directions(const int sz_x, const int sz_y, const int nodata, __global const float *const data, __global unsigned char *const directions) {
-	__private const int x = get_global_id(0);
-	__private const int y = get_global_id(1);
-
-	const unsigned long max_x = sz_x - 1;
-	const unsigned long max_y = sz_y - 1;
-
-	//if (((int) get(data, x, y, sz_x)) != nodata) {
-	if (((int) data[x * sz_x + y]) != nodata) {
-
-		//float minimum_value = get(data, x, y, sz_x);
-		float minimum_value = data[x * sz_x + y];
-		float current;
-		unsigned char direction = 0;
-
-		if (x > 0 && y > 0) {
-			//current = get(data, x - 1, y - 1, sz_x);
-			current = data[(x - 1) * sz_x + y - 1];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 1;
-				minimum_value = current;
-			}
-		}
-
-		if (x > 0) {
-			//current = get(data, x - 1, y, sz_x);
-			current = data[(x - 1) * sz_x + y];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 2;
-				minimum_value = current;
-			}
-		}
-
-		if (x > 0 && y < max_y) {
-			//current = get(data, x - 1, y + 1, sz_x);
-			current = data[(x - 1) * sz_x + y + 1];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 3;
-				minimum_value = current;
-			}
-		}
-
-		if (y < max_y) {
-			current = data[x * sz_x + y + 1];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 4;
-				minimum_value = current;
-			}
-		}
-
-		if (y < max_y && x < max_x) {
-			//current = get(data, x + 1, y + 1, sz_x);
-			current = data[(x + 1) * sz_x + y + 1];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 5;
-				minimum_value = current;
-			}
-		}
-
-		if (x < max_x) {
-			current = data[(x + 1) * sz_x + y];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 6;
-				minimum_value = current;
-			}
-		}
-
-		if (x < max_x && y > 0) {
-			//current = get(data, x + 1, y - 1, sz_x);
-			current = data[(x + 1) * sz_x + y - 1];
-			if (current < minimum_value && ((int) current != nodata)) {
-				direction = 7;
-				minimum_value = current;
-			}
-		}
-
-		if (y > 0) {
-			current = data[x * sz_x + y - 1];
-			if (current < minimum_value && ((int) current != nodata)) direction = 8;
-		}
-
-		directions[x * sz_x + y] = direction;
+void direction(__global float *data, __global int *direction,
+			   const int sz_x, const int sz_y,
+			   __local float *neighbors, const int nodata) {
+	int idT = get_global_id(0);
+	int i = idT / sz_x;
+	int j = (idT - (i * sz_x));
+	int val = 0;
+	int index = i * sz_x + j;
+	float min = data[index];
+	if ( (int)min == nodata ) {
+		direction[index] = 0;
+		return;
 	}
+	int index_min = -1;
+	for (int k = 0; k < 8; ++k) {
+		neighbors[k] = -1;
+	}
+//NORD
+	if (i > 0) {
+		neighbors[1] = data[(i - 1) * sz_x + j]; // n id : 1
+		if (j > 0) {
+			neighbors[0] = data[(i - 1) * sz_x + (j - 1)]; // no id : 0
+		}
+		if (j < sz_y - 1) {
+			neighbors[2] = data[(i - 1) * sz_x + (j + 1)]; // ne id : 2
+		}
+	}
+//SUD
+	if (i < sz_x - 1) {
+		neighbors[5] = data[(i + 1) * sz_x + j]; // s id : 5
+		if (j > 0) {
+			neighbors[6] = data[(i + 1) * sz_x + (j - 1)]; // so id : 6
+		}
+		if (j < sz_y - 1) {
+			neighbors[4] = data[(i + 1) * sz_x + (j + 1)]; // se id : 4
+		}
+	}
+//Ouest
+	if (j > 0) {
+		neighbors[7] = data[index - 1]; // o id : 7
+	}//Est
+	if (j < sz_y - 1) {
+		neighbors[3] = data[index + 1]; // e id : 3
+	}
+	for (int k = 0; k < 8; ++k) {
+// Pour chaque neighbors
+		if (neighbors[k] != -1 && (int)neighbors[k] != nodata && min > neighbors[k]) {
+			min = neighbors[k];
+			index_min = k;
+		}
+	}
+	direction[index] = (index_min == -1) ? 0 : index_min + 1;
 }
 
-__kernel
-void compute(const int sz_x, const int sz_y, __global const unsigned char *const directions, __global unsigned char *const water, __global bool* const hasChanged) {
-	__private const int x = get_global_id(0);
-	__private const int y = get_global_id(1);
+__kernel void compute(__global int *res, __global int *direction, const int nx, const int ny) {
+	int idT = get_global_id(0);
+	int i = idT / nx;
+	int j = (idT - (i * nx));
+	int index = i * nx + j;
+	int val = 0;
+	if (i > 0) {
+		if (direction[(i - 1) * nx + j] == 6) {
+			if (res[(i - 1) * nx + j] != 0) {
+				val += res[(i - 1) * nx + j]; // n
+			} else {
+				return;
+			}
+		}
+		if (j > 0) {
+			if (direction[(i - 1) * nx + (j - 1)] == 5)
+				if (res[(i - 1) * nx + (j - 1)] != 0) {
+					val += res[(i - 1) * nx + (j - 1)];// no
 
-	const unsigned long max_x = sz_x - 1;
-	const unsigned long max_y = sz_y - 1;
+				} else {
+					return;
+				}
+		}
+		if (j < ny - 1) {
+			if (direction[(i - 1) * nx + (j + 1)] == 7)
+				if (res[(i - 1) * nx + (j + 1)] != 0) {
+					val += res[(i - 1) * nx + (j + 1)];// ne
+
+				} else {
+					return;
+				}
+		}
+	}
+	//SUD
+	if (i < nx - 1) {
+		if (direction[(i + 1) * nx + j] == 2)
+			if (res[(i + 1) * nx + j] != 0) {
+				val += res[(i + 1) * nx + j];// s
+
+			} else {
+				return;
+			}
+		if (j > 0) {
+			if (direction[(i + 1) * nx + (j - 1)] == 3)
+				if (res[(i + 1) * nx + (j - 1)] != 0) {
+					val += res[(i + 1) * nx + (j - 1)];// so
+
+				} else {
+					return;
+				}
+		}
+		if (j < ny - 1) {
+			if (direction[(i + 1) * nx + (j + 1)] == 1)
+				if (res[(i + 1) * nx + (j + 1)] != 0) {
+					val += res[(i + 1) * nx + (j + 1)];// se
+
+				} else {
+					return;
+				}
+		}
+	}
+	//Ouest
+	if (j > 0) {
+		if (direction[index - 1] == 4)
+			if (res[index - 1] != 0) {
+				val += res[index - 1];// o
+			} else {
+				return;
+			}
+	}
+	//Est
+	if (j < ny - 1) {
+		if (direction[index + 1] == 8)
+			if (res[index + 1] != 0) {
+				val += res[index + 1];// e
+
+			} else {
+				return;
+			}
+	}
+	val++;
+	res[index] = val;
 }
