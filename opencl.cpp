@@ -165,6 +165,10 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 	// Fetch result
 	queue.enqueueReadBuffer(direction_buffer, CL_TRUE, 0, sz_x * sz_y * sizeof(int), directions);
 
+	Duration elapsed = NOW - start;
+	std::clog << "Direction elapsed: " << elapsed.count() << std::endl;
+
+
 	LOG(
 		print_array(directions, sz_x, sz_y, "DIRECTION");
 		print_in_file(directions, sz_x, sz_y, "DIRECTION", true);
@@ -172,6 +176,7 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 
 	// ######################################################################################################################
 
+	Time start1 = NOW;
 
 	// Create buffers
 	cl::Buffer water_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(int) * sz_x * sz_y);
@@ -195,6 +200,9 @@ void GPU(const cl::Program &program, const cl::CommandQueue &queue, const cl::Co
 		print_array(water, sz_x, sz_y, "WATER");
 		print_in_file(water, sz_x, sz_y, "WATER", false);
 	)
+
+	elapsed = NOW - start1;
+	std::clog << "Water elapsed: " << elapsed.count() << std::endl;
 
 	duration(start, NOW);
 }
