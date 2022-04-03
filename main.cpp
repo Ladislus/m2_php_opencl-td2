@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <chrono>
 #include "CL/cl.h"
 
 #include "config.h"
@@ -17,6 +18,15 @@
 DECL_GET(float)
 DECL_SET(float)
 DECL_GET(uint8_t)
+
+#define NOW std::chrono::system_clock::now()
+using Time = std::chrono::time_point <std::chrono::system_clock>;
+using Duration = std::chrono::duration<double>;
+
+inline void duration(const Time &start, const Time &end) {
+	Duration elapsed = end - start;
+	std::clog << "Elapsed time: " << elapsed.count() << "s" << std::endl;
+}
 
 void read_file(size_t& sz_x, size_t& sz_y, size_t& left, size_t& right, size_t& cell, int& nodata, float **data) {
 	FILE *fp = fopen(FILENAME, "r");
@@ -214,6 +224,8 @@ int main() {
 		}
 	)
 
+	Time start = NOW;
+
 	uint8_t *directions = generator_direction(sz_x, sz_y, data, nodata);
 
 	LOG(
@@ -234,6 +246,8 @@ int main() {
 	do {
 		hasChanged = iteration(directions, water, sz_x, sz_y);
 	} while (hasChanged);
+
+	duration(start, NOW);
 
 	LOG(
 		std::clog << "Water:" << std::endl;

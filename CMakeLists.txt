@@ -7,7 +7,7 @@ SET(OPENCL_NAME opencl)
 SET(others MNT.txt MIN.txt kernel.cl)
 
 # Pass variable from CMake to the code through a header file
-SET(filename MIN.txt)
+SET(filename MNT.txt)
 SET(program kernel.cl)
 
 # Add compile flags and VERBOSE option depending on the compilation type
